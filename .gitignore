@@ -1,0 +1,39 @@
+# Environment variables & secrets
+.env
+.env.local
+.env.*.local
+*.env
+backend/.env
+frontend/.env
+
+# Node dependencies & build artifacts
+node_modules/
+frontend/node_modules/
+frontend/tsconfig.tsbuildinfo
+
+# Python artifacts & virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+backend/safeai.db
+backend/safeai_new.db
+backend/safeai_new.db-shm
+backend/safeai_new.db-wal
+
+# OS metadata
+.DS_Store
+Thumbs.db
+desktop.ini
+*.tmp
