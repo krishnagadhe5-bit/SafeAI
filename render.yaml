@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: safeai
+    runtime: python
+    region: oregon
+    plan: free
+    buildCommand: "npm --prefix frontend install && npm --prefix frontend run build && pip install -r backend/requirements.txt"
+    startCommand: "cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    healthCheckPath: /api/v1/health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: APP_ENV
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        value: sqlite:///./safeai_new.db
+      - key: SUPABASE_URL
+        value: https://plnycngtqohraelhgoll.supabase.co
+      - key: SUPABASE_KEY
+        value: sb_publishable_txaUxbzHMRtD0EwsB5eVqA_G6izB5p_
+      - key: VITE_SUPABASE_URL
+        value: https://plnycngtqohraelhgoll.supabase.co
+      - key: VITE_SUPABASE_PUBLISHABLE_KEY
+        value: sb_publishable_txaUxbzHMRtD0EwsB5eVqA_G6izB5p_
+      - key: CORS_ORIGINS
+        value: "*"

@@ -43,19 +43,37 @@ class MLService:
         self._classes: list[str] = []
 
     def load(self, model_path: str | None = None) -> None:
-        path = Path(model_path or settings.MODEL_PATH)
-        if not path.is_absolute():
-            path = Path(__file__).resolve().parents[2] / path
-        if not path.exists():
-            raise FileNotFoundError(f"Model file not found: {path}")
+        target = Path(model_path or settings.MODEL_PATH)
+        if not target.is_absolute():
+            resolved = Path(__file__).resolve().parents[2] / target
+        else:
+            resolved = target
 
-        data = joblib.load(path)
+        # Robust multi-path resolution
+        if not resolved.exists():
+            candidates = [
+                Path(__file__).resolve().parents[1] / "model.joblib",
+                Path(__file__).resolve().parents[2] / "backend" / "model.joblib",
+                Path(__file__).resolve().parents[2] / "ml" / "model" / "model.joblib",
+                Path("model.joblib").resolve(),
+                Path("backend/model.joblib").resolve(),
+            ]
+            for c in candidates:
+                if c.exists():
+                    resolved = c
+                    break
+            else:
+                raise FileNotFoundError(f"Model file not found at {resolved} or fallback locations")
+
+        data = joblib.load(resolved)
         self._model = data["model"]
         self._accuracy = data.get("accuracy", 0.0)
         self._training_rows = data.get("rows", 0)
         self._classes = list(self._model.classes_)
         logger.info(
-            "ML model loaded: accuracy=%.3f, rows=%d, classes=%s",
+            "ML model loaded from %s: accuracy=%.3f, rows=%d, classes=%s",
+            resolved, self._accuracy, self._training_rows, self._classes,
+        )
             self._accuracy, self._training_rows, self._classes,
         )
 

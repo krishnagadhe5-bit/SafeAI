@@ -86,8 +86,16 @@ def health():
 app.include_router(v1_router)
 
 # Mount production React build if dist exists
-FRONTEND_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
-if FRONTEND_DIST.exists():
+FRONTEND_CANDIDATES = [
+    Path(__file__).resolve().parents[2] / "frontend" / "dist",
+    Path(__file__).resolve().parents[1] / "frontend" / "dist",
+    Path("frontend/dist").resolve(),
+    Path("../frontend/dist").resolve(),
+]
+FRONTEND_DIST = next((p for p in FRONTEND_CANDIDATES if p.exists() and (p / "index.html").exists()), None)
+
+if FRONTEND_DIST:
+    logger.info("Serving static frontend from: %s", FRONTEND_DIST)
     assets_dir = FRONTEND_DIST / "assets"
     if assets_dir.exists():
         app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
@@ -100,3 +108,5 @@ if FRONTEND_DIST.exists():
         if file_path.exists() and file_path.is_file():
             return FileResponse(file_path)
         return FileResponse(FRONTEND_DIST / "index.html")
+else:
+    logger.warning("No compiled frontend/dist directory found. API endpoints will serve normally.")
