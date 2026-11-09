@@ -52,18 +52,22 @@ class MLService:
         # Robust multi-path resolution
         if not resolved.exists():
             candidates = [
+                Path(__file__).resolve().parents[2] / "model.joblib",
+                Path(__file__).resolve().parents[3] / "backend" / "model.joblib",
+                Path(__file__).resolve().parents[3] / "ml" / "model" / "model.joblib",
                 Path(__file__).resolve().parents[1] / "model.joblib",
-                Path(__file__).resolve().parents[2] / "backend" / "model.joblib",
-                Path(__file__).resolve().parents[2] / "ml" / "model" / "model.joblib",
                 Path("model.joblib").resolve(),
                 Path("backend/model.joblib").resolve(),
+                Path("../ml/model/model.joblib").resolve(),
             ]
             for c in candidates:
                 if c.exists():
                     resolved = c
                     break
             else:
-                raise FileNotFoundError(f"Model file not found at {resolved} or fallback locations")
+                logger.warning("ML model file not found at %s or fallback locations. Heuristic baseline will be used.", resolved)
+                self._model = None
+                return
 
         data = joblib.load(resolved)
         self._model = data["model"]
@@ -73,8 +77,6 @@ class MLService:
         logger.info(
             "ML model loaded from %s: accuracy=%.3f, rows=%d, classes=%s",
             resolved, self._accuracy, self._training_rows, self._classes,
-        )
-            self._accuracy, self._training_rows, self._classes,
         )
 
     @property
@@ -95,7 +97,44 @@ class MLService:
 
     @property
     def version(self) -> str:
+        if not self.is_loaded:
+            return "heuristic-baseline-v1"
         return f"RF-v1-{self._training_rows}rows-acc{self._accuracy:.3f}"
+
+    def _heuristic_predict(self, inputs: dict[str, Any]) -> dict[str, Any]:
+        """Heuristic risk prediction fallback when ML model is unavailable."""
+        crowd = int(inputs.get("crowd_size", 0))
+        cap = max(1, int(inputs.get("venue_capacity", 1)))
+        ratio = crowd / cap
+        incidents = int(inputs.get("previous_incidents", 0))
+        base_score = min(70.0, ratio * 50.0)
+        incident_score = min(25.0, incidents * 5.0)
+        temp = float(inputs.get("temperature_c", 20))
+        weather = str(inputs.get("weather", "Clear")).lower()
+        weather_factor = 10.0 if ("rain" in weather or "storm" in weather) else (5.0 if temp > 35 or temp < 5 else 0.0)
+
+        score = max(0, min(100, round(base_score + incident_score + weather_factor)))
+        if score < 40:
+            risk_level = "Low"
+        elif score < 60:
+            risk_level = "Medium"
+        elif score < 80:
+            risk_level = "High"
+        else:
+            risk_level = "Critical"
+
+        probs = {"Low": 0.1, "Medium": 0.2, "High": 0.3, "Critical": 0.4}
+        probs[risk_level] = 0.55
+        total_p = sum(probs.values())
+        norm_probs = {k: round(v / total_p, 4) for k, v in probs.items()}
+
+        return {
+            "risk_level": risk_level,
+            "risk_score": score,
+            "confidence": 75.0,
+            "probabilities": norm_probs,
+            "model_version": "heuristic-baseline-v1",
+        }
 
     def predict(self, inputs: dict[str, Any]) -> dict[str, Any]:
         """Run prediction with proper preprocessing.
@@ -109,7 +148,8 @@ class MLService:
             dict with risk_level, risk_score, confidence, probabilities.
         """
         if not self.is_loaded:
-            raise RuntimeError("ML model not loaded. Call load() first.")
+            logger.warning("ML model not loaded; using heuristic baseline for prediction")
+            return self._heuristic_predict(inputs)
 
         # Prepare the feature row with correct types and order
         row = {

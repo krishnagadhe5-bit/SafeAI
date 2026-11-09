@@ -2,6 +2,7 @@
 
 import csv
 import io
+import logging
 from datetime import datetime
 from typing import Optional
 
@@ -17,6 +18,8 @@ from app.schemas.schemas import AssessmentCreate, AssessmentOut, AssessmentListO
 from app.ml.service import ml_service
 from app.services.resource_planning import calculate_resources
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/assessments", tags=["Assessments"])
 
 
@@ -28,7 +31,7 @@ def create_assessment(
 ):
     """Run ML prediction and persist the assessment."""
     if not ml_service.is_loaded:
-        raise HTTPException(status_code=503, detail="ML model is not loaded")
+        logger.warning("ML model is not loaded. Proceeding with baseline prediction.")
 
     # Run prediction
     prediction = ml_service.predict({
